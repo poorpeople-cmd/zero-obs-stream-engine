@@ -1,0 +1,64 @@
+name: Zero-OBS Direct Stream
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_url:
+        description: "Web page URL containing the video player"
+        required: true
+        type: string
+      duration_minutes:
+        description: "Maximum stream duration in minutes (max 340)"
+        required: false
+        default: "180"
+        type: string
+
+jobs:
+  stream:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup Chrome for Testing
+        id: setup-chrome
+        uses: browser-actions/setup-chrome@v2
+        with:
+          install-dependencies: true
+
+      - name: Install FFmpeg and Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg xvfb
+
+      - name: Start Bridge and Launch Browser
+        env:
+          RTMP_URL: ${{ secrets.RTMP_URL }}
+          SOURCE_URL: ${{ github.event.inputs.source_url }}
+          DURATION_MINUTES: ${{ github.event.inputs.duration_minutes }}
+        run: |
+          # Start the Node.js FFmpeg bridge in the background
+          node bridge.js &
+          BRIDGE_PID=$!
+          sleep 2
+
+          # Launch Chrome for Testing in a virtual display with the unpacked extension
+          xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
+            "${{ steps.setup-chrome.outputs.chrome-path }}" \
+            --no-sandbox \
+            --disable-dev-shm-usage \
+            --disable-gpu \
+            --autoplay-policy=no-user-gesture-required \
+            --disable-extensions-except="$PWD/extension" \
+            --load-extension="$PWD/extension" \
+            "$SOURCE_URL" &
+
+          # Wait for the bridge/FFmpeg process to complete
+          wait $BRIDGE_PID
