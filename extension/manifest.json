@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "HLS Stream Sniffer Bridge",
+  "version": "1.0.0",
+  "permissions": [
+    "webRequest",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
+}
