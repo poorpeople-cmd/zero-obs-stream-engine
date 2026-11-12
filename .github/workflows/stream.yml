@@ -7,6 +7,27 @@ on:
         description: "Web page URL containing the video player"
         required: true
         type: string
+      stream_key:
+        description: "Stream Key ID (e.g. 1, 1.4, s1.1) or custom key/RTMP URL"
+        required: true
+        default: "1"
+        type: string
+      stream_quality:
+        description: "Stream Quality & Bitrate"
+        required: false
+        default: "Original (1080p Max)"
+        type: choice
+        options:
+          - "Original (1080p Max)"
+          - "1080p"
+          - "720p"
+          - "480p"
+          - "360p"
+      force_refresh_minutes:
+        description: "Auto-refresh stream token every X minutes (0 = disabled)"
+        required: false
+        default: "0"
+        type: string
       duration_minutes:
         description: "Maximum stream duration in minutes (max 340)"
         required: false
@@ -38,27 +59,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg xvfb
 
-      - name: Start Bridge and Launch Browser
+      - name: Run Smart Stream Engine
         env:
-          RTMP_URL: ${{ secrets.RTMP_URL }}
           SOURCE_URL: ${{ github.event.inputs.source_url }}
+          STREAM_KEY: ${{ github.event.inputs.stream_key }}
+          STREAM_QUALITY: ${{ github.event.inputs.stream_quality }}
+          FORCE_REFRESH_MINUTES: ${{ github.event.inputs.force_refresh_minutes }}
           DURATION_MINUTES: ${{ github.event.inputs.duration_minutes }}
+          CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
         run: |
-          # Start the Node.js FFmpeg bridge in the background
-          node bridge.js &
-          BRIDGE_PID=$!
-          sleep 2
-
-          # Launch Chrome for Testing in a virtual display with the unpacked extension
-          xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
-            "${{ steps.setup-chrome.outputs.chrome-path }}" \
-            --no-sandbox \
-            --disable-dev-shm-usage \
-            --disable-gpu \
-            --autoplay-policy=no-user-gesture-required \
-            --disable-extensions-except="$PWD/extension" \
-            --load-extension="$PWD/extension" \
-            "$SOURCE_URL" &
-
-          # Wait for the bridge/FFmpeg process to complete
-          wait $BRIDGE_PID
+          xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" node bridge.js
